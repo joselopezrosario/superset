@@ -43,10 +43,11 @@ import { useHostWorkspaces } from "renderer/routes/_authenticated/providers/Host
 import { useLocalHostService } from "renderer/routes/_authenticated/providers/LocalHostServiceProvider";
 import { ScrollToBottomButton } from "renderer/screens/main/components/WorkspaceView/ContentView/TabsContent/Terminal/ScrollToBottomButton";
 import { TerminalSearch } from "renderer/screens/main/components/WorkspaceView/ContentView/TabsContent/Terminal/TerminalSearch";
-import { useTheme } from "renderer/stores/theme";
+import { useTheme, useThemeStore } from "renderer/stores/theme";
 import { resolveTerminalThemeType } from "renderer/stores/theme/utils";
 import { isWithinWorkspacePath } from "shared/absolute-paths";
 import { useLinkClickHint } from "../../hooks/useLinkClickHint";
+import { findTerminalTheme } from "../../utils/findTerminalTheme";
 import {
 	runFileLinkAction,
 	runFolderLinkAction,
@@ -56,6 +57,7 @@ import {
 import { TerminalAgentAutoResume } from "./components/TerminalAgentAutoResume";
 import { TerminalCopiedIndicator } from "./components/TerminalCopiedIndicator";
 import { TerminalRichInput } from "./components/TerminalRichInput";
+import { TERMINAL_SESSION_LIST_STALE_MS } from "./components/TerminalSessionDropdown/TerminalSessionDropdown.utils";
 import { terminalContextMenuLinkStore } from "./contextMenuLinkStore";
 import { useCopyOnSelect } from "./hooks/useCopyOnSelect";
 import { type HoveredLink, useLinkHoverState } from "./hooks/useLinkHoverState";
@@ -131,7 +133,27 @@ export function TerminalPane({
 	// dropdown).
 	const isRichInputOpen = useTerminalRichInputOpen();
 
-	const appearance = useTerminalAppearance();
+	const { data: sessionThemeId } = workspaceTrpc.terminal.list.useQuery(
+		{ workspaceId },
+		{
+			select: (data) => {
+				const session = data.sessions.find(
+					(candidate) => candidate.terminalId === terminalId,
+				);
+				return session ? (session.themeId ?? null) : undefined;
+			},
+			staleTime: TERMINAL_SESSION_LIST_STALE_MS,
+			refetchOnWindowFocus: false,
+		},
+	);
+	const effectiveThemeId =
+		sessionThemeId === undefined ? (paneData.themeId ?? null) : sessionThemeId;
+	const customThemes = useThemeStore((state) => state.customThemes);
+	const sessionTheme = useMemo(
+		() => findTerminalTheme(effectiveThemeId, customThemes),
+		[effectiveThemeId, customThemes],
+	);
+	const appearance = useTerminalAppearance(sessionTheme);
 	const appearanceRef = useRef(appearance);
 	appearanceRef.current = appearance;
 
@@ -139,7 +161,7 @@ export function TerminalPane({
 	// gets the right COLORFGBG; PTY env is set at spawn time only.
 	const activeTheme = useTheme();
 	const themeType = resolveTerminalThemeType({
-		activeThemeType: activeTheme?.type,
+		activeThemeType: sessionTheme?.type ?? activeTheme?.type,
 	});
 	const baseWebsocketUrl = useWorkspaceWsUrl(`/terminal/${terminalId}`);
 	const themedUrl = new URL(baseWebsocketUrl);
@@ -147,6 +169,8 @@ export function TerminalPane({
 	themedUrl.searchParams.set("themeType", themeType);
 	if (paneData.createOnAttach) {
 		themedUrl.searchParams.set("create", "1");
+		if (paneData.themeId)
+			themedUrl.searchParams.set("themeId", paneData.themeId);
 	}
 	const websocketUrl = themedUrl.toString();
 	const websocketUrlRef = useRef(websocketUrl);
