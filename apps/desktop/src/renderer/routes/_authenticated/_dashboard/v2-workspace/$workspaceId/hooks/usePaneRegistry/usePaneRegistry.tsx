@@ -497,7 +497,9 @@ export function usePaneRegistry({
 								(session) => session.terminalId === paneData.terminalId,
 							);
 						const storedThemeId =
-							paneData.themeId ?? currentSession?.themeId ?? null;
+							paneData.themeId !== undefined
+								? paneData.themeId
+								: (currentSession?.themeId ?? null);
 						const currentThemeId =
 							findTerminalTheme(storedThemeId, customThemes)?.id ?? null;
 						const chooseTheme = (themeId: string | null) => {
@@ -505,7 +507,7 @@ export function usePaneRegistry({
 							if (!currentSession || paneData.themeId !== undefined) {
 								ctx.actions.updateData({
 									...paneData,
-									themeId: themeId ?? undefined,
+									themeId,
 								} as PaneViewerData);
 							}
 							if (!currentSession) return;

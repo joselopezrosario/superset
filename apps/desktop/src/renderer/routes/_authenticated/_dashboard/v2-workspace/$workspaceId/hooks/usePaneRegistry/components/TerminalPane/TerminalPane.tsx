@@ -147,7 +147,8 @@ export function TerminalPane({
 		},
 	);
 	const pendingThemeId = paneData.themeId;
-	const effectiveThemeId = pendingThemeId ?? sessionThemeId ?? null;
+	const effectiveThemeId =
+		pendingThemeId !== undefined ? pendingThemeId : (sessionThemeId ?? null);
 	const customThemes = useThemeStore((state) => state.customThemes);
 	const sessionTheme = useMemo(
 		() => findTerminalTheme(effectiveThemeId, customThemes),
@@ -189,19 +190,24 @@ export function TerminalPane({
 	// theme picked in that window is kept on the pane and sent from here.
 	const paneRef = useRef(ctx);
 	paneRef.current = ctx;
-	const syncingThemeIdRef = useRef<string | null>(null);
+	const syncingThemeRef = useRef<string | null>(null);
 	const hasSession = sessionThemeId !== undefined;
 	useEffect(() => {
-		if (!pendingThemeId || !hasSession) return;
-		if (syncingThemeIdRef.current === pendingThemeId) return;
-		syncingThemeIdRef.current = pendingThemeId;
+		if (pendingThemeId === undefined || !hasSession) return;
+		const syncKey = `${terminalId}:${pendingThemeId}`;
+		if (syncingThemeRef.current === syncKey) return;
+		syncingThemeRef.current = syncKey;
 		workspaceTrpcUtils.client.terminal.setTheme
 			.mutate({ terminalId, workspaceId, themeId: pendingThemeId })
 			.then(async () => {
 				await workspaceTrpcUtils.terminal.list.invalidate({ workspaceId });
 				const { pane, actions } = paneRef.current;
 				const current = pane.data as TerminalPaneData;
-				if (current.themeId !== pendingThemeId) return;
+				if (
+					current.terminalId !== terminalId ||
+					current.themeId !== pendingThemeId
+				)
+					return;
 				actions.updateData({
 					...current,
 					themeId: undefined,
@@ -211,7 +217,7 @@ export function TerminalPane({
 				console.error("[terminal] Failed to save terminal theme", error);
 			})
 			.finally(() => {
-				syncingThemeIdRef.current = null;
+				syncingThemeRef.current = null;
 			});
 	}, [pendingThemeId, hasSession, terminalId, workspaceId, workspaceTrpcUtils]);
 
