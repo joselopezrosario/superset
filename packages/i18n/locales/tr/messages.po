@@ -6509,7 +6509,7 @@ msgid "Failed to update team. Please try again."
 msgstr "Takım güncellenemedi. Lütfen yeniden deneyin."
 
 msgid "Failed to update terminal theme"
-msgstr "Terminal temasi guncellenemedi"
+msgstr "Terminal teması güncellenemedi"
 
 msgid "Failed to update URL"
 msgstr "URL güncellenemedi"

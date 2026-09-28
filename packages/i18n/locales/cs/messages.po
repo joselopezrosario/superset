@@ -6509,7 +6509,7 @@ msgid "Failed to update team. Please try again."
 msgstr "Nepodařilo se aktualizovat tým. Zkuste to prosím znovu."
 
 msgid "Failed to update terminal theme"
-msgstr "Nepodarilo se aktualizovat motiv terminalu"
+msgstr "Nepodařilo se aktualizovat motiv terminálu"
 
 msgid "Failed to update URL"
 msgstr "Nepodařilo se změnit URL"
