@@ -146,8 +146,8 @@ export function TerminalPane({
 			refetchOnWindowFocus: false,
 		},
 	);
-	const effectiveThemeId =
-		sessionThemeId === undefined ? (paneData.themeId ?? null) : sessionThemeId;
+	const pendingThemeId = paneData.themeId;
+	const effectiveThemeId = pendingThemeId ?? sessionThemeId ?? null;
 	const customThemes = useThemeStore((state) => state.customThemes);
 	const sessionTheme = useMemo(
 		() => findTerminalTheme(effectiveThemeId, customThemes),
@@ -184,6 +184,36 @@ export function TerminalPane({
 	);
 	invalidateTerminalSessionsRef.current =
 		workspaceTrpcUtils.terminal.list.invalidate;
+
+	// The socket attach creates the session before the list shows it, so a
+	// theme picked in that window is kept on the pane and sent from here.
+	const paneRef = useRef(ctx);
+	paneRef.current = ctx;
+	const syncingThemeIdRef = useRef<string | null>(null);
+	const hasSession = sessionThemeId !== undefined;
+	useEffect(() => {
+		if (!pendingThemeId || !hasSession) return;
+		if (syncingThemeIdRef.current === pendingThemeId) return;
+		syncingThemeIdRef.current = pendingThemeId;
+		workspaceTrpcUtils.client.terminal.setTheme
+			.mutate({ terminalId, workspaceId, themeId: pendingThemeId })
+			.then(async () => {
+				await workspaceTrpcUtils.terminal.list.invalidate({ workspaceId });
+				const { pane, actions } = paneRef.current;
+				const current = pane.data as TerminalPaneData;
+				if (current.themeId !== pendingThemeId) return;
+				actions.updateData({
+					...current,
+					themeId: undefined,
+				} as PaneViewerData);
+			})
+			.catch((error: unknown) => {
+				console.error("[terminal] Failed to save terminal theme", error);
+			})
+			.finally(() => {
+				syncingThemeIdRef.current = null;
+			});
+	}, [pendingThemeId, hasSession, terminalId, workspaceId, workspaceTrpcUtils]);
 
 	// useCallback so useSyncExternalStore doesn't re-subscribe every render —
 	// otherwise every keystroke-triggered re-render unsubscribes and

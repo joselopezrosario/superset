@@ -496,20 +496,19 @@ export function usePaneRegistry({
 							?.sessions.find(
 								(session) => session.terminalId === paneData.terminalId,
 							);
-						const storedThemeId = currentSession
-							? currentSession.themeId
-							: (paneData.themeId ?? null);
+						const storedThemeId =
+							paneData.themeId ?? currentSession?.themeId ?? null;
 						const currentThemeId =
 							findTerminalTheme(storedThemeId, customThemes)?.id ?? null;
 						const chooseTheme = (themeId: string | null) => {
 							if (themeId === storedThemeId) return;
-							if (paneData.createOnAttach && !currentSession) {
+							if (!currentSession || paneData.themeId !== undefined) {
 								ctx.actions.updateData({
 									...paneData,
 									themeId: themeId ?? undefined,
 								} as PaneViewerData);
-								return;
 							}
+							if (!currentSession) return;
 							workspaceTrpcUtils.client.terminal.setTheme
 								.mutate({
 									terminalId: paneData.terminalId,
